@@ -5,7 +5,11 @@
     <RootNamespace>work_time_counter.Functions</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Microsoft.Azure.WebJobs.Extensions.Storage" Version="3.0.1" />
     <PackageReference Include="Microsoft.NET.Sdk.Functions" Version="3.0.13" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\work-time-counter.Common\work-time-counter.Common.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Update="host.json">
