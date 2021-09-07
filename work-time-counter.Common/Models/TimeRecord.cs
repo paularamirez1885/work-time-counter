@@ -11,4 +11,5 @@ namespace work_time_counter.Common.Models
         public bool consolidate { get; set; }
 
     }
+
 }
