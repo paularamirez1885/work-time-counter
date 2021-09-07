@@ -22,8 +22,6 @@ namespace work_time_counter.Functions.Functions
             [Table("recordTime", Connection = "AzureWebJobsStorage")] CloudTable recordTimeTable,
             ILogger log)
         {
-            log.LogInformation("create new time record");
-
             string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
             TimeRecord record = JsonConvert.DeserializeObject<TimeRecord>(requestBody);
 
@@ -38,14 +36,12 @@ namespace work_time_counter.Functions.Functions
 
             if (record != null && record.idEmployee == 0)
             {
-                log.LogInformation($"id employeee {record.idEmployee}");
                 return new BadRequestObjectResult(new Response
                 {
                     isSuccess = false,
                     message = "To record an event, have to send id employee"
                 });
             }
-
             TImeRecordEntity timeRecordEntity = new TImeRecordEntity
             {
                 idEmployee = record.idEmployee,
@@ -79,8 +75,6 @@ namespace work_time_counter.Functions.Functions
             string id,
             ILogger log)
         {
-            log.LogInformation($"Update record with id: {id}");
-
             string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
             TimeRecord record = JsonConvert.DeserializeObject<TimeRecord>(requestBody);
 
@@ -116,8 +110,6 @@ namespace work_time_counter.Functions.Functions
             TableOperation addOperation = TableOperation.Replace(timeRecordEntity);
             await recordTimeTable.ExecuteAsync(addOperation);
             string message = "New time saved succesfull";
-            log.LogInformation(message);
-
             return new OkObjectResult(new Response
             {
                 isSuccess = true,
@@ -132,14 +124,10 @@ namespace work_time_counter.Functions.Functions
            [Table("recordTime", Connection = "AzureWebJobsStorage")] CloudTable recordTimeTable,
            ILogger log)
         {
-            log.LogInformation("Get all registers.");
-
             TableQuery<TImeRecordEntity> query = new TableQuery<TImeRecordEntity>();
             TableQuerySegment<TImeRecordEntity> list = await recordTimeTable.ExecuteQuerySegmentedAsync(query, null);
 
             string message = "list of registers.";
-            log.LogInformation(message);
-
             return new OkObjectResult(new Response
             {
                 isSuccess = true,
@@ -155,8 +143,6 @@ namespace work_time_counter.Functions.Functions
             string id,
             ILogger log)
         {
-            log.LogInformation($"Get time register by id: {id}");
-
             if (timeRecordEntity == null)
             {
                 return new BadRequestObjectResult(new Response
@@ -167,8 +153,6 @@ namespace work_time_counter.Functions.Functions
             }
 
             string message = $"Register: {timeRecordEntity.RowKey}, retrieved.";
-            log.LogInformation(message);
-
             return new OkObjectResult(new Response
             {
                 isSuccess = true,
@@ -185,8 +169,6 @@ namespace work_time_counter.Functions.Functions
             string id,
             ILogger log)
         {
-            log.LogInformation($"Delete register: {id}, received.");
-
             if (timeRecordEntity == null)
             {
                 return new BadRequestObjectResult(new Response
@@ -198,13 +180,52 @@ namespace work_time_counter.Functions.Functions
 
             await recordTimeTable.ExecuteAsync(TableOperation.Delete(timeRecordEntity));
             string message = $"register: {timeRecordEntity.RowKey}, deleted.";
-            log.LogInformation(message);
-
             return new OkObjectResult(new Response
             {
                 isSuccess = true,
                 message = message,
                 Result = timeRecordEntity
+            });
+        }
+
+        [FunctionName(nameof(GetConsolidateByDate))]
+        public static async Task<IActionResult> GetConsolidateByDate(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "consolidate/{date}")] HttpRequest req,
+            [Table("consolidateTime", Connection = "AzureWebJobsStorage")] CloudTable consolidateTimeTable,
+            string date,
+            ILogger log)
+        {
+            DateTime queryDate = Convert.ToDateTime(date);
+            string dateFrom= TableQuery.GenerateFilterConditionForDate("date", QueryComparisons.GreaterThanOrEqual, queryDate);
+            string dateTo = TableQuery.GenerateFilterConditionForDate("date", QueryComparisons.LessThan, queryDate.AddDays(1));
+            string filter = TableQuery.CombineFilters(dateFrom, TableOperators.And, dateTo);
+            TableQuery<ConsolidatedTimeEntity> query = new TableQuery<ConsolidatedTimeEntity>().Where(filter);
+            TableQuerySegment<ConsolidatedTimeEntity> consolidatedDay = await consolidateTimeTable.ExecuteQuerySegmentedAsync(query, null);
+
+            int timeByDay = 0;
+
+            log.LogInformation($"query result {consolidatedDay}");
+
+            if (consolidatedDay == null)
+            {
+                return new BadRequestObjectResult(new Response
+                {
+                    isSuccess = false,
+                    message = "don't exist any register for this day"
+                });
+            }
+
+            foreach (ConsolidatedTimeEntity consoli in consolidatedDay)
+            {
+                timeByDay = timeByDay + consoli.workedTime;
+            }
+
+            string message = $"total minutes working on {queryDate.ToShortDateString()}.";
+            return new OkObjectResult(new Response
+            {
+                isSuccess = true,
+                message = message,
+                Result = timeByDay,
             });
         }
     }
